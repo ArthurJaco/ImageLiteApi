@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-imagelite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-imagelite-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-imagelite}
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imagelite} -d ${POSTGRES_DB:-imagelite}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-imagelite}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-imagelite}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-imagelite-local-only}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-production}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      - '8080:8080'
+
+  pgadmin:
+    image: dpage/pgadmin4
+    profiles: ["tools"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin-local-only}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+    ports:
+      - '15432:80'
+    depends_on:
+      - db
+
+volumes:
+  postgres-data:
